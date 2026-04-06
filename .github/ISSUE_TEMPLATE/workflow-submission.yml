@@ -1,7 +1,8 @@
 name: Submit a Workflow
 description: Add your Pegasus workflow to the PegasusHub registry
 title: "[WORKFLOW] "
-labels: ["workflow-submission"]
+labels:
+  - workflow-submission
 body:
   - type: markdown
     attributes:
