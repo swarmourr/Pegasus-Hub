@@ -2,11 +2,11 @@ name: Create Workflow from Issue
 
 on:
   issues:
-    types: [opened]
+    types: [labeled]
 
 jobs:
   validate-and-create:
-    if: contains(github.event.issue.labels.*.name, 'workflow-submission')
+    if: github.event.label.name == 'workflow-submission'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -62,7 +62,7 @@ jobs:
               if (!fields[key]) errors.push(`Missing required field: **${label}**`);
             }
 
-            // 2. Validate github_repo is a valid GitHub URL
+            // 2. Validate GitHub URL format
             if (fields.github_repo && !fields.github_repo.match(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/)) {
               errors.push(`**GitHub Repository URL** must be a valid GitHub URL (e.g. \`https://github.com/user/repo\`)`);
             }
@@ -73,13 +73,9 @@ jobs:
                 const urlParts = new URL(fields.github_repo).pathname.split('/').filter(Boolean);
                 const owner = urlParts[0];
                 const repo  = urlParts[1];
-
                 const { data } = await github.rest.repos.get({ owner, repo });
-
                 if (data.private) {
                   errors.push(`**GitHub Repository** \`${owner}/${repo}\` is **private**. It must be public to be listed on PegasusHub.`);
-                } else {
-                  core.info(`✅ Repo ${owner}/${repo} is public.`);
                 }
               } catch (e) {
                 if (e.status === 404) {
@@ -153,14 +149,12 @@ jobs:
               fields.image ? `![${fields.name}](${fields.image})` : '_No visualization provided._',
             ].join('\n');
 
-            const contentEncoded = Buffer.from(content).toString('base64');
-
             await github.rest.repos.createOrUpdateFileContents({
               owner: context.repo.owner,
               repo: context.repo.repo,
               path: filename,
               message: `feat: add workflow "${fields.name}" (#${context.issue.number})`,
-              content: contentEncoded,
+              content: Buffer.from(content).toString('base64'),
             });
 
             await github.rest.issues.createComment({
