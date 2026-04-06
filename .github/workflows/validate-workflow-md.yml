@@ -1,0 +1,57 @@
+name: Validate Workflow Submission
+
+on:
+  pull_request:
+    paths:
+      - '*.md'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find new or modified .md files
+        id: find
+        run: |
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.md$' || true)
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      - name: Validate YAML frontmatter fields
+        run: |
+          REQUIRED_FIELDS="github_owner github_repo pegasus_version Topic license last_verified name description"
+          FAILED=0
+
+          for FILE in ${{ steps.find.outputs.files }}; do
+            echo "Checking: $FILE"
+
+            # Extract content between first pair of ---
+            YAML=$(awk '/^---/{found++; next} found==1' "$FILE")
+
+            for FIELD in $REQUIRED_FIELDS; do
+              if ! echo "$YAML" | grep -qi "^${FIELD}:"; then
+                echo "  ❌ Missing required field: $FIELD"
+                FAILED=1
+              else
+                echo "  ✅ $FIELD"
+              fi
+            done
+
+            # Check required markdown sections
+            for SECTION in "Description" "File Description" "How to run"; do
+              if ! grep -qi "## ${SECTION}" "$FILE"; then
+                echo "  ❌ Missing required section: ## $SECTION"
+                FAILED=1
+              else
+                echo "  ✅ Section: $SECTION"
+              fi
+            done
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "Validation failed. Please fill in all required fields and sections."
+            exit 1
+          fi
+
+          echo "All checks passed!"

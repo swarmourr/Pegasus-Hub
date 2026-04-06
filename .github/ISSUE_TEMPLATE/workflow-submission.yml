@@ -1,12 +1,3 @@
----
-name: Workflow Submission
-about: Describe Your workflow to add to our registry
-title: ADD workflow
-labels: ''
-assignees: ''
-
----
-
 name: Submit a Workflow
 description: Add your Pegasus workflow to the PegasusHub registry
 title: "[WORKFLOW] "
