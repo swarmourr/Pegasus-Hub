@@ -1,0 +1,29 @@
+{
+  "count": 2,
+  "workflows": [
+    {
+      "id": "merge-workflow",
+      "name": "merge-workflow",
+      "description": "",
+      "topic": "",
+      "github_owner": "pegasus-isi",
+      "github_repo": "https://github.com/pegasus-isi/merge-workflow",
+      "pegasus_version": ">= 5.0.0",
+      "license": "No license available",
+      "last_verified": "Jan 06, 2023",
+      "image": "https://user-images.githubusercontent.com/36110304/212752962-59adc85a-ab1d-481a-bf30-13791df85428.png"
+    },
+    {
+      "id": "split-workflow",
+      "name": "split-workflow",
+      "description": "",
+      "topic": "",
+      "github_owner": "pegasus-isi",
+      "github_repo": "https://github.com/pegasus-isi/split-workflow",
+      "pegasus_version": ">= 5.0.0",
+      "license": "No license available",
+      "last_verified": "Oct 27, 2025",
+      "image": "https://user-images.githubusercontent.com/36110304/212753610-843a44c9-9703-4dd1-9e50-86bd2a4deba7.png"
+    }
+  ]
+}
