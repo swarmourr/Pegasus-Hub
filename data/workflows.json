@@ -1,5 +1,5 @@
 {
-  "count": 15,
+  "count": 16,
   "workflows": [
     {
       "id": "1000genomes",
@@ -144,6 +144,18 @@
       "license": "Apache License 2.0",
       "last_verified": "May 01, 2023",
       "image": ""
+    },
+    {
+      "id": "seaice-workflow",
+      "name": "seaice-workflow",
+      "description": "k",
+      "topic": "climat, AI",
+      "github_owner": "kthare10",
+      "github_repo": "https://github.com/kthare10/seaice-workflow",
+      "pegasus_version": ">= 5.2.0",
+      "license": "Apache License 2.0",
+      "last_verified": "2026-04-02",
+      "image": "https://raw.githubusercontent.com/kthare10/seaice-workflow/main/images/workflow.png"
     },
     {
       "id": "split-workflow",
