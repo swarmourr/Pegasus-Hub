@@ -93,6 +93,8 @@ jobs:
           workflows = []
           skipped = []
 
+          print(os.walk('.'))
+
           # Walk entire repo to find .md files (handles subdirectories too)
           for root, dirs, files in os.walk('.'):
               # Skip hidden dirs and data/
