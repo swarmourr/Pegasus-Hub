@@ -21,9 +21,14 @@ jobs:
         with:
           script: |
             const title = context.payload.issue.title || '';
-            if (!title.includes('WORKFLOW')) return;
+            core.info(`Issue title: "${title}"`);
+            if (!title.includes('WORKFLOW')) {
+              core.info('Not a workflow submission, skipping.');
+              return;
+            }
 
             const body = context.payload.issue.body || '';
+            core.info(`Issue body length: ${body.length} chars`);
             const errors = [];
 
             function extract(label) {
@@ -46,6 +51,11 @@ jobs:
               file_description: extract('File Description'),
               how_to_run:       extract('How to Run'),
             };
+
+            core.info('--- Extracted fields ---');
+            for (const [k, v] of Object.entries(fields)) {
+              core.info(`  ${k}: "${v ? v.substring(0, 80) : '(empty)'}"`);
+            }
 
             // 1. Check required fields
             const required = {
@@ -89,6 +99,9 @@ jobs:
                 }
               }
             }
+
+            core.info(`--- Validation: ${errors.length} error(s) ---`);
+            errors.forEach(e => core.info(`  ❌ ${e}`));
 
             // --- INVALID: comment and stop ---
             if (errors.length > 0) {
