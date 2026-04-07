@@ -24,11 +24,14 @@ jobs:
           python3 << 'EOF'
           import os, json, re
 
+          SKIP = {'readme.md', 'contributing.md', 'license.md', 'changelog.md'}
+
           def parse_frontmatter(content):
-              """Extract YAML frontmatter from a markdown file."""
+              # Normalize line endings
+              content = content.replace('\r\n', '\n').replace('\r', '\n')
               match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
               if not match:
-                  return {}
+                  return None
               fm = {}
               for line in match.group(1).splitlines():
                   if ':' in line:
@@ -37,38 +40,57 @@ jobs:
               return fm
 
           workflows = []
+          skipped = []
 
-          for filename in sorted(os.listdir('.')):
-              if not filename.endswith('.md'):
-                  continue
-              if filename.lower() in ('readme.md', 'contributing.md', 'license.md'):
-                  continue
+          # Walk entire repo to find .md files (handles subdirectories too)
+          for root, dirs, files in os.walk('.'):
+              # Skip hidden dirs and data/
+              dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'data']
+              for filename in sorted(files):
+                  if not filename.endswith('.md'):
+                      continue
+                  if filename.lower() in SKIP:
+                      continue
 
-              with open(filename, 'r', encoding='utf-8') as f:
-                  content = f.read()
+                  filepath = os.path.join(root, filename)
+                  with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                      content = f.read()
 
-              meta = parse_frontmatter(content)
-              if not meta.get('name'):
-                  continue
+                  meta = parse_frontmatter(content)
+                  if meta is None:
+                      skipped.append(f"  ⚠ {filepath} — no frontmatter found")
+                      continue
 
-              workflows.append({
-                  "id":              filename.replace('.md', ''),
-                  "name":            meta.get('name', ''),
-                  "description":     meta.get('description', ''),
-                  "topic":           meta.get('Topic', meta.get('topic', '')),
-                  "github_owner":    meta.get('github_owner', ''),
-                  "github_repo":     meta.get('github_repo', ''),
-                  "pegasus_version": meta.get('pegasus_version', ''),
-                  "license":         meta.get('license', ''),
-                  "last_verified":   meta.get('last_verified', ''),
-                  "image":           meta.get('image', ''),
-              })
+                  # Accept 'name' or 'title' as identifier
+                  name = meta.get('name') or meta.get('title') or meta.get('Name') or meta.get('Title') or ''
+                  if not name:
+                      skipped.append(f"  ⚠ {filepath} — no name/title field. Keys found: {list(meta.keys())}")
+                      continue
+
+                  wf_id = filename.replace('.md', '')
+                  workflows.append({
+                      "id":              wf_id,
+                      "name":            name,
+                      "description":     meta.get('description') or meta.get('Description', ''),
+                      "topic":           meta.get('Topic') or meta.get('topic', ''),
+                      "github_owner":    meta.get('github_owner', ''),
+                      "github_repo":     meta.get('github_repo', ''),
+                      "pegasus_version": meta.get('pegasus_version', ''),
+                      "license":         meta.get('license', ''),
+                      "last_verified":   meta.get('last_verified', ''),
+                      "image":           meta.get('image', ''),
+                  })
+                  print(f"  ✅ {filepath} → {name}")
+
+          if skipped:
+              print("\nSkipped files:")
+              for s in skipped: print(s)
 
           os.makedirs('data', exist_ok=True)
           with open('data/workflows.json', 'w', encoding='utf-8') as f:
               json.dump({"count": len(workflows), "workflows": workflows}, f, indent=2)
 
-          print(f"✅ Indexed {len(workflows)} workflow(s) → data/workflows.json")
+          print(f"\n✅ Indexed {len(workflows)} workflow(s) → data/workflows.json")
           EOF
 
       - name: Commit workflows.json
