@@ -2,11 +2,11 @@ name: Create Workflow from Issue
 
 on:
   issues:
-    types: [labeled]
+    types: [opened]
 
 jobs:
   validate-and-create:
-    if: github.event.label.name == 'workflow-submission'
+    if: startsWith(github.event.issue.title, '[WORKFLOW]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -15,16 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Parse and validate issue form fields
-        id: parse
+      - name: Validate and create workflow
         uses: actions/github-script@v7
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           script: |
-            const body = context.payload.issue.body;
+            const body = context.payload.issue.body || '';
             const errors = [];
 
             function extract(label) {
-              const regex = new RegExp(`### ${label}\\s*\\n+([\\s\\S]*?)(?=\\n###|$)`, 'i');
+              const regex = new RegExp(`### ${label}\\s*\\r?\\n+([\\s\\S]*?)(?=\\r?\\n###|$)`, 'i');
               const match = body.match(regex);
               const val = match ? match[1].trim() : '';
               return (val === '_No response_' || val === '') ? '' : val;
@@ -63,12 +64,13 @@ jobs:
             }
 
             // 2. Validate GitHub URL format
-            if (fields.github_repo && !fields.github_repo.match(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/)) {
+            const ghUrlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/;
+            if (fields.github_repo && !ghUrlPattern.test(fields.github_repo)) {
               errors.push(`**GitHub Repository URL** must be a valid GitHub URL (e.g. \`https://github.com/user/repo\`)`);
             }
 
             // 3. Check repo is public via GitHub API
-            if (fields.github_repo && fields.github_repo.match(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/)) {
+            if (fields.github_repo && ghUrlPattern.test(fields.github_repo)) {
               try {
                 const urlParts = new URL(fields.github_repo).pathname.split('/').filter(Boolean);
                 const owner = urlParts[0];
@@ -86,40 +88,31 @@ jobs:
               }
             }
 
-            core.setOutput('fields', JSON.stringify(fields));
-            core.setOutput('errors', errors.join('||'));
-            core.setOutput('valid', errors.length === 0 ? 'true' : 'false');
+            // --- INVALID: comment and stop ---
+            if (errors.length > 0) {
+              const list = errors.map(e => `- ${e}`).join('\n');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `## ❌ Submission Validation Failed\n\nPlease fix the following issues and resubmit:\n\n${list}\n\n---\n_Once fixed, close this issue and open a new one._`
+              });
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: ['invalid']
+                });
+              } catch (_) {}
+              return;
+            }
 
-      - name: Comment on invalid submission
-        if: steps.parse.outputs.valid == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const errors = `${{ steps.parse.outputs.errors }}`.split('||').filter(Boolean);
-            const list = errors.map(e => `- ${e}`).join('\n');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `## ❌ Submission Validation Failed\n\nPlease fix the following issues and resubmit:\n\n${list}\n\n---\n_Once fixed, close this issue and open a new one._`
-            });
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: ['invalid']
-            });
-
-      - name: Generate and commit .md file
-        if: steps.parse.outputs.valid == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fields = JSON.parse('${{ steps.parse.outputs.fields }}');
+            // --- VALID: generate and commit .md ---
             const slug = fields.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
             const filename = `${slug}.md`;
 
-            const content = [
+            const lines = [
               '---',
               `github_owner: "${fields.github_owner}"`,
               `github_repo: "${fields.github_repo}"`,
@@ -129,7 +122,7 @@ jobs:
               `last_verified: "${fields.last_verified}"`,
               `image: "${fields.image || ''}"`,
               `name: "${fields.name}"`,
-              `description: "${fields.description.split('\n')[0]}"`,
+              `description: "${fields.description.split('\n')[0].replace(/"/g, "'")}"`,
               '---',
               '',
               `# Title : ${fields.name}`,
@@ -147,14 +140,16 @@ jobs:
               '',
               '## THE WORKFLOW VISUALISATION',
               fields.image ? `![${fields.name}](${fields.image})` : '_No visualization provided._',
-            ].join('\n');
+            ];
+
+            const content = Buffer.from(lines.join('\n')).toString('base64');
 
             await github.rest.repos.createOrUpdateFileContents({
               owner: context.repo.owner,
               repo: context.repo.repo,
               path: filename,
               message: `feat: add workflow "${fields.name}" (#${context.issue.number})`,
-              content: Buffer.from(content).toString('base64'),
+              content,
             });
 
             await github.rest.issues.createComment({
