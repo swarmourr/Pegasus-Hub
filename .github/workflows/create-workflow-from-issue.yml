@@ -2,11 +2,10 @@ name: Create Workflow from Issue
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened]
 
 jobs:
   validate-and-create:
-    if: startsWith(github.event.issue.title, '[WORKFLOW]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -21,6 +20,9 @@ jobs:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           script: |
+            const title = context.payload.issue.title || '';
+            if (!title.includes('WORKFLOW')) return;
+
             const body = context.payload.issue.body || '';
             const errors = [];
 
