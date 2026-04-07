@@ -19,6 +19,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: pip install pyyaml -q
+
       - name: Parse all .md files and build workflows.json
         run: |
           python3 << 'EOF'
@@ -26,18 +29,21 @@ jobs:
 
           SKIP = {'readme.md', 'contributing.md', 'license.md', 'changelog.md'}
 
+          import yaml
+
           def parse_frontmatter(content):
               # Normalize line endings
               content = content.replace('\r\n', '\n').replace('\r', '\n')
               match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
               if not match:
                   return None
-              fm = {}
-              for line in match.group(1).splitlines():
-                  if ':' in line:
-                      key, _, val = line.partition(':')
-                      fm[key.strip()] = val.strip().strip('"').strip("'")
-              return fm
+              try:
+                  fm = yaml.safe_load(match.group(1)) or {}
+                  # Ensure all values are strings
+                  return {k: str(v) if v is not None else '' for k, v in fm.items()}
+              except yaml.YAMLError as e:
+                  print(f"    YAML parse error: {e}")
+                  return None
 
           workflows = []
           skipped = []
