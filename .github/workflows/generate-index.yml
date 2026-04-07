@@ -1,0 +1,81 @@
+name: Generate Workflows Index
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Parse all .md files and build workflows.json
+        run: |
+          python3 << 'EOF'
+          import os, json, re
+
+          def parse_frontmatter(content):
+              """Extract YAML frontmatter from a markdown file."""
+              match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+              if not match:
+                  return {}
+              fm = {}
+              for line in match.group(1).splitlines():
+                  if ':' in line:
+                      key, _, val = line.partition(':')
+                      fm[key.strip()] = val.strip().strip('"').strip("'")
+              return fm
+
+          workflows = []
+
+          for filename in sorted(os.listdir('.')):
+              if not filename.endswith('.md'):
+                  continue
+              if filename.lower() in ('readme.md', 'contributing.md', 'license.md'):
+                  continue
+
+              with open(filename, 'r', encoding='utf-8') as f:
+                  content = f.read()
+
+              meta = parse_frontmatter(content)
+              if not meta.get('name'):
+                  continue
+
+              workflows.append({
+                  "id":              filename.replace('.md', ''),
+                  "name":            meta.get('name', ''),
+                  "description":     meta.get('description', ''),
+                  "topic":           meta.get('Topic', meta.get('topic', '')),
+                  "github_owner":    meta.get('github_owner', ''),
+                  "github_repo":     meta.get('github_repo', ''),
+                  "pegasus_version": meta.get('pegasus_version', ''),
+                  "license":         meta.get('license', ''),
+                  "last_verified":   meta.get('last_verified', ''),
+                  "image":           meta.get('image', ''),
+              })
+
+          os.makedirs('data', exist_ok=True)
+          with open('data/workflows.json', 'w', encoding='utf-8') as f:
+              json.dump({"count": len(workflows), "workflows": workflows}, f, indent=2)
+
+          print(f"✅ Indexed {len(workflows)} workflow(s) → data/workflows.json")
+          EOF
+
+      - name: Commit workflows.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/workflows.json
+          git diff --cached --quiet && echo "No changes to commit" || \
+            git commit -m "chore: rebuild workflows index [skip ci]"
+          git push
