@@ -170,18 +170,6 @@
       "image": "https://user-images.githubusercontent.com/36110304/212753610-843a44c9-9703-4dd1-9e50-86bd2a4deba7.png"
     },
     {
-      "id": "sra-search",
-      "name": "sra-search-pegasus-workflow",
-      "description": "",
-      "topic": "bioinformatics, genomics",
-      "github_owner": "pegasus-isi",
-      "github_repo": "https://github.com/pegasus-isi/sra-search-pegasus-workflow",
-      "pegasus_version": "No version information available",
-      "license": "Apache License 2.0",
-      "last_verified": "Feb 17, 2026",
-      "image": ""
-    },
-    {
       "id": "variant-calling",
       "name": "variant-calling-pegasus-workflow",
       "description": "",
